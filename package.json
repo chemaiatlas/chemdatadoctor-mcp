@@ -4,11 +4,26 @@
   "description": "Local, offline chemical data cleaning tools over MCP stdio",
   "license": "MIT",
   "type": "module",
-  "engines": { "node": ">=22.12" },
-  "bin": { "chemdatadoctor-mcp": "dist/cli.js" },
+  "engines": {
+    "node": ">=22.12"
+  },
+  "bin": {
+    "chemdatadoctor-mcp": "dist/cli.js"
+  },
   "exports": "./dist/server.js",
-  "files": ["dist", "README.md", "LICENSE", "THIRD_PARTY_NOTICES.md", "third-party-licenses", "docs", "examples"],
-  "repository": { "type": "git", "url": "https://github.com/chemaiatlas/chemdatadoctor-mcp.git" },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
+    "third-party-licenses",
+    "docs",
+    "examples"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chemaiatlas/chemdatadoctor-mcp.git"
+  },
   "scripts": {
     "build": "tsc",
     "start": "node dist/cli.js",
@@ -16,6 +31,7 @@
     "schemas": "npm run build && node scripts/export-schemas.mjs",
     "licenses": "node scripts/licenses.mjs",
     "check:release": "node scripts/check-release.mjs",
+    "check:dependencies": "node scripts/check-dependencies.mjs",
     "prepack": "npm run build && npm run check:release"
   },
   "dependencies": {
