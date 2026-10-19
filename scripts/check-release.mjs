@@ -6,13 +6,21 @@ const pkg = JSON.parse(await readFile('package.json', 'utf8'));
 assert.equal(pkg.license, 'MIT');
 assert(!pkg.private);
 assert.equal(pkg.dependencies.xlsx, 'https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz');
-const roots = ['src', 'tests', 'scripts', 'docs', 'examples', '.github'];
-const files = ['package.json', 'package-lock.json', 'README.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md'];
+// Public CI is maintained in the public repository, outside automatic sync scope.
+const roots = ['src', 'tests', 'scripts', 'docs', 'examples'];
+const files = [
+  'package.json',
+  'package-lock.json',
+  'README.md',
+  'LICENSE',
+  'THIRD_PARTY_NOTICES.md',
+];
 async function walk(dir) {
   for (const entry of await readdir(dir, { withFileTypes: true })) {
     const file = path.join(dir, entry.name);
     assert(!entry.isSymbolicLink(), `Symlink in release tree: ${file}`);
-    if (entry.isDirectory()) await walk(file); else files.push(file);
+    if (entry.isDirectory()) await walk(file);
+    else files.push(file);
   }
 }
 for (const dir of roots) await walk(dir);
@@ -20,11 +28,21 @@ for (const file of files) {
   assert(!/(?:^|\/)\.env(?:\.|$)|\.(?:pem|key|p12)$/.test(file), `Sensitive filename: ${file}`);
   const body = await readFile(file, 'utf8');
   assert(!/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/.test(body), `Private key: ${file}`);
-  assert(!/(?:AKIA|ASIA)[A-Z0-9]{16}|gh[pousr]_[A-Za-z0-9]{30,}|sk-(?:proj-)?[A-Za-z0-9_-]{40,}/.test(body), `Credential pattern: ${file}`);
+  assert(
+    !/(?:AKIA|ASIA)[A-Z0-9]{16}|gh[pousr]_[A-Za-z0-9]{30,}|sk-(?:proj-)?[A-Za-z0-9_-]{40,}/.test(
+      body,
+    ),
+    `Credential pattern: ${file}`,
+  );
   assert(!/\/Users\/[^/\s]+\/|(?:\d{1,3}\.){3}\d{1,3}/.test(body), `Internal path or IP: ${file}`);
 }
-for (const file of files.filter(f => f.startsWith('src/'))) {
+for (const file of files.filter((f) => f.startsWith('src/'))) {
   const body = await readFile(file, 'utf8');
-  assert(!/\bfetch\s*\(|https?:\/\/|from ['"]node:(?:http|https|net|dns)['"]|process\.env/.test(body), `Unexpected runtime network/config access: ${file}`);
+  assert(
+    !/\bfetch\s*\(|https?:\/\/|from ['"]node:(?:http|https|net|dns)['"]|process\.env/.test(body),
+    `Unexpected runtime network/config access: ${file}`,
+  );
 }
-console.log(`Release boundary checked: ${files.length} files; MIT package, no detected credentials/internal paths or application network calls.`);
+console.log(
+  `Release boundary checked: ${files.length} files; MIT package, no detected credentials/internal paths or application network calls.`,
+);
