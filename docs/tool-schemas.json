@@ -1,0 +1,845 @@
+{
+  "tools": [
+    {
+      "name": "validate_cas",
+      "description": "Check local CAS format/checksum. Optional conservative format fixes. Never verifies registration or substance identity. Up to 100 values.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "values": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 10000
+            },
+            "minItems": 1,
+            "maxItems": 100
+          },
+          "applyFixes": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "values"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "results": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "original": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "string"
+                    },
+                    "valid": {
+                      "type": "boolean"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "healthy",
+                        "fixable",
+                        "warning",
+                        "invalid",
+                        "empty"
+                      ]
+                    },
+                    "suggestion": {
+                      "type": "string"
+                    },
+                    "findings": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "category": {
+                            "type": "string",
+                            "enum": [
+                              "error",
+                              "warning",
+                              "automatic_fix",
+                              "unverifiable"
+                            ]
+                          },
+                          "code": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "category",
+                          "code",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "original",
+                    "value",
+                    "valid",
+                    "status",
+                    "findings"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "results"
+            ],
+            "additionalProperties": false
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "normalize_names",
+      "description": "Normalize whitespace/invisible characters only. Preserves capitalization and chemical notation; no systematic naming or synonym lookup. Up to 100 values.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "values": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 10000
+            },
+            "minItems": 1,
+            "maxItems": 100
+          },
+          "applyFixes": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": [
+          "values"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "results": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "original": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "string"
+                    },
+                    "suggestion": {
+                      "type": "string"
+                    },
+                    "findings": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "category": {
+                            "type": "string",
+                            "enum": [
+                              "error",
+                              "warning",
+                              "automatic_fix",
+                              "unverifiable"
+                            ]
+                          },
+                          "code": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "category",
+                          "code",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "original",
+                    "value",
+                    "suggestion",
+                    "findings"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "results"
+            ],
+            "additionalProperties": false
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "validate_formulas",
+      "description": "Check limited formula grammar: elements, integer counts, parentheses, brackets and hydrates. Charges/isotopes/polymers are unverifiable; no plausibility check.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "values": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 10000
+            },
+            "minItems": 1,
+            "maxItems": 100
+          }
+        },
+        "required": [
+          "values"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "results": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "original": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "valid_syntax",
+                        "invalid",
+                        "unverifiable"
+                      ]
+                    },
+                    "atoms": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "number"
+                      }
+                    },
+                    "findings": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "category": {
+                            "type": "string",
+                            "enum": [
+                              "error",
+                              "warning",
+                              "automatic_fix",
+                              "unverifiable"
+                            ]
+                          },
+                          "code": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "category",
+                          "code",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "original",
+                    "status",
+                    "atoms",
+                    "findings"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "results"
+            ],
+            "additionalProperties": false
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "detect_duplicates",
+      "description": "Find repeated CAS identifiers using safe normalization, or exact text for uncertain values. Zero-based indexes. Does not remove rows or resolve identities.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "values": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 10000
+            },
+            "minItems": 1,
+            "maxItems": 1000
+          }
+        },
+        "required": [
+          "values"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "duplicates": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "index": {
+                      "type": "integer"
+                    },
+                    "duplicateOf": {
+                      "type": "integer"
+                    },
+                    "key": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "index",
+                    "duplicateOf",
+                    "key"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "findings": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "category": {
+                      "type": "string",
+                      "enum": [
+                        "error",
+                        "warning",
+                        "automatic_fix",
+                        "unverifiable"
+                      ]
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "code",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "total",
+              "duplicates",
+              "findings"
+            ],
+            "additionalProperties": false
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "clean_dataset",
+      "description": "Clean a local CSV/TSV/XLS/XLSX/JSON file or small inline row array. Explicit zero-based column mapping. Writes new local artifacts; preserves source and originals. Default summary only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "summary": {
+                "type": "object",
+                "properties": {
+                  "totalRows": {
+                    "type": "integer"
+                  },
+                  "changedRows": {
+                    "type": "integer"
+                  },
+                  "duplicateRows": {
+                    "type": "integer"
+                  },
+                  "findings": {
+                    "type": "object",
+                    "properties": {
+                      "error": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "warning": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "automatic_fix": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "unverifiable": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    },
+                    "required": [
+                      "error",
+                      "warning",
+                      "automatic_fix",
+                      "unverifiable"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "rowsByCategory": {
+                    "$ref": "#/properties/data/properties/summary/properties/findings"
+                  },
+                  "issuesByCode": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "integer"
+                    }
+                  }
+                },
+                "required": [
+                  "totalRows",
+                  "changedRows",
+                  "duplicateRows",
+                  "findings",
+                  "rowsByCategory",
+                  "issuesByCode"
+                ],
+                "additionalProperties": false
+              },
+              "artifacts": {
+                "type": "object",
+                "properties": {
+                  "results": {
+                    "type": "string"
+                  },
+                  "report": {
+                    "type": "string"
+                  },
+                  "csv": {
+                    "type": "string"
+                  },
+                  "excel": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "results",
+                  "report",
+                  "csv",
+                  "excel"
+                ],
+                "additionalProperties": false
+              },
+              "samples": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "sourceRow": {
+                      "type": "integer"
+                    },
+                    "casStatus": {
+                      "type": "string"
+                    },
+                    "issueCodes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "duplicateOf": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "sourceRow",
+                    "casStatus",
+                    "issueCodes"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "summary",
+              "artifacts",
+              "samples"
+            ],
+            "additionalProperties": false
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "quality_report",
+      "description": "Read and inspect a dataset without writing files. Same path/row limits and zero-based mappings as clean_dataset. applyFixes previews safe fixes only. Default summary only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "summary": {
+                "type": "object",
+                "properties": {
+                  "totalRows": {
+                    "type": "integer"
+                  },
+                  "changedRows": {
+                    "type": "integer"
+                  },
+                  "duplicateRows": {
+                    "type": "integer"
+                  },
+                  "findings": {
+                    "type": "object",
+                    "properties": {
+                      "error": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "warning": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "automatic_fix": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "unverifiable": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    },
+                    "required": [
+                      "error",
+                      "warning",
+                      "automatic_fix",
+                      "unverifiable"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "rowsByCategory": {
+                    "$ref": "#/properties/data/properties/summary/properties/findings"
+                  },
+                  "issuesByCode": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "integer"
+                    }
+                  }
+                },
+                "required": [
+                  "totalRows",
+                  "changedRows",
+                  "duplicateRows",
+                  "findings",
+                  "rowsByCategory",
+                  "issuesByCode"
+                ],
+                "additionalProperties": false
+              },
+              "samples": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "sourceRow": {
+                      "type": "integer"
+                    },
+                    "casStatus": {
+                      "type": "string"
+                    },
+                    "issueCodes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "duplicateOf": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "sourceRow",
+                    "casStatus",
+                    "issueCodes"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "summary",
+              "samples"
+            ],
+            "additionalProperties": false
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    }
+  ]
+}

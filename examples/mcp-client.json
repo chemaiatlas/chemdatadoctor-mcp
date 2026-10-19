@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "chemdatadoctor": {
+      "command": "node",
+      "args": ["/absolute/path/to/chemdatadoctor-mcp/dist/cli.js", "--data-root", "/absolute/path/to/data"]
+    }
+  }
+}
