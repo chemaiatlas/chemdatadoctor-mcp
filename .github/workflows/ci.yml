@@ -4,6 +4,11 @@ on:
   push:
   pull_request:
   workflow_call:
+    inputs:
+      ref:
+        description: 'Exact source commit to validate for a release'
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -22,6 +27,7 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           persist-credentials: false
+          ref: ${{ inputs.ref || github.sha }}
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ matrix.node }}
