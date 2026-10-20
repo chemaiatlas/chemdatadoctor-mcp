@@ -3,46 +3,72 @@ name: Release
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag to build (for example v0.1.0)'
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
   version:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.target.outputs.tag }}
+      commit: ${{ steps.target.outputs.commit }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           persist-credentials: false
+          ref: refs/tags/${{ inputs.tag || github.ref_name }}
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '24'
-      - run: node scripts/verify-tag.mjs
+      - name: Verify and pin the existing release tag
+        id: target
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          GITHUB_REF_TYPE=tag GITHUB_REF_NAME="$RELEASE_TAG" node scripts/verify-tag.mjs
+          printf 'tag=%s\n' "$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+          printf 'commit=%s\n' "$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
   validate:
     needs: version
     uses: ./.github/workflows/ci.yml
+    with:
+      ref: ${{ needs.version.outputs.commit }}
     permissions:
       contents: read
 
   package:
-    needs: validate
+    needs: [version, validate]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           persist-credentials: false
+          ref: ${{ needs.version.outputs.commit }}
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '24'
           cache: npm
-      - run: node scripts/verify-tag.mjs
+      - name: Verify packaged version
+        env:
+          RELEASE_TAG: ${{ needs.version.outputs.tag }}
+        shell: bash
+        run: GITHUB_REF_TYPE=tag GITHUB_REF_NAME="$RELEASE_TAG" node scripts/verify-tag.mjs
       - run: npm ci --ignore-scripts
       - run: npm test
       - run: npm run build
@@ -58,7 +84,7 @@ jobs:
           retention-days: 3
 
   publish:
-    needs: package
+    needs: [version, package]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -68,17 +94,68 @@ jobs:
         with:
           name: release-assets
           path: release
-      - name: Verify assets and create GitHub Release
+      - name: Verify assets, ensure Release exists, and upload missing assets
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_TAG: ${{ needs.version.outputs.tag }}
         shell: bash
         run: |
           set -euo pipefail
           cd release
-          sha256sum --check SHA256SUMS
-          args=()
-          if [[ "$RELEASE_TAG" == *-* ]]; then args+=(--prerelease); fi
-          gh release create "$RELEASE_TAG" ./*.tgz SHA256SUMS \
-            --verify-tag --title "$RELEASE_TAG" --generate-notes "${args[@]}"
+          archive="chemdatadoctor-mcp-${RELEASE_TAG#v}.tgz"
+          # Accept exactly the expected archive and its single checksum entry.
+          test -f "$archive"
+          test "$(wc -l < SHA256SUMS)" -eq 1
+          awk -v name="$archive" 'length($1) == 64 && $1 !~ /[^0-9a-f]/ && $2 == name && NF == 2 { valid=1 } END { exit !valid }' SHA256SUMS
+          sha256sum --check --strict SHA256SUMS
+
+          # Only a real 404 means absent. Authentication/network errors must fail.
+          tag_path=$(jq -rn --arg tag "$RELEASE_TAG" '$tag | @uri')
+          if gh api "repos/$GH_REPO/releases/tags/$tag_path" > release.json 2> lookup.err; then
+            echo "Reusing existing Release $RELEASE_TAG"
+          elif grep -q '(HTTP 404)' lookup.err; then
+            args=(--verify-tag --title "$RELEASE_TAG" --generate-notes)
+            if [[ "$RELEASE_TAG" == *-* ]]; then args+=(--prerelease); fi
+            gh release create "$RELEASE_TAG" "${args[@]}"
+            gh api "repos/$GH_REPO/releases/tags/$tag_path" > release.json
+          else
+            cat lookup.err >&2
+            exit 1
+          fi
+          release_id=$(jq -er '.id' release.json)
+          gh api --paginate "repos/$GH_REPO/releases/$release_id/assets?per_page=100" \
+            --jq '.[] | [.name, (.id | tostring)] | @tsv' > assets.tsv
+
+          verify_asset() {
+            local file="$1" id="$2" actual expected
+            gh api -H 'Accept: application/octet-stream' \
+              "repos/$GH_REPO/releases/assets/$id" > remote-asset
+            expected=$(sha256sum "$file" | cut -d ' ' -f 1)
+            actual=$(sha256sum remote-asset | cut -d ' ' -f 1)
+            if [[ "$actual" != "$expected" ]]; then
+              echo "::error::SHA-256 mismatch for existing asset $file; refusing to overwrite."
+              return 1
+            fi
+          }
+
+          # Check every existing name before uploading anything, including SHA256SUMS.
+          missing=()
+          for file in "$archive" SHA256SUMS; do
+            id=$(awk -F '\t' -v name="$file" '$1 == name { print $2 }' assets.tsv)
+            if [[ -n "$id" ]]; then
+              verify_asset "$file" "$id"
+              echo "Identical asset $file; skipping."
+            else
+              missing+=("$file")
+            fi
+          done
+          for file in ${missing[@]+"${missing[@]}"}; do
+            # No --clobber: concurrent uploads must never replace an existing asset.
+            gh release upload "$RELEASE_TAG" "$file"
+            id=$(gh api --paginate "repos/$GH_REPO/releases/$release_id/assets?per_page=100" \
+              --jq ".[] | select(.name == \"$file\") | .id")
+            test -n "$id"
+            verify_asset "$file" "$id"
+            echo "Uploaded and verified $file"
+          done
