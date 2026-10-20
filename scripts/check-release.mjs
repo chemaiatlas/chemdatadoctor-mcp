@@ -6,9 +6,11 @@ const pkg = JSON.parse(await readFile('package.json', 'utf8'));
 assert.equal(pkg.license, 'MIT');
 assert(!pkg.private);
 assert.equal(pkg.dependencies.xlsx, 'https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz');
-// Public CI is maintained in the public repository, outside automatic sync scope.
+// These two workflows share the reviewed standalone export boundary.
 const roots = ['src', 'tests', 'scripts', 'docs', 'examples'];
 const files = [
+  '.github/workflows/ci.yml',
+  '.github/workflows/release.yml',
   'package.json',
   'package-lock.json',
   'README.md',

@@ -1,24 +1,103 @@
-# Standalone repository handoff
+# GitHub releases
 
-This directory is the entire intended root of `chemaiatlas/chemdatadoctor-mcp`.
-Do not publish the parent website repository, parent Git history, deployment
-files, installed modules, generated user artifacts, environment files or secrets.
-The implementation task does not create a remote, push commits or publish npm.
+The standalone export is the single source of truth for `.github/workflows/ci.yml`
+and `release.yml`. Both are explicitly exported along with MCP sources. Other
+public workflows are preserved. Never copy the parent application or its Git history
+into this repository. Installation packages contain only compiled MCP code,
+package metadata, public documentation, examples and third-party license texts.
 
-Before an owner-approved release:
+## Validation and release behavior
 
-1. Run `npm ci --ignore-scripts`, `npm test`, `npm run schemas`, `npm run licenses`,
-   `npm run check:release`, `npm audit --omit=dev` and `npm pack --dry-run`.
-2. Copy this directory into an empty repository, excluding `node_modules`, `dist`,
-   `artifacts`, `.git`, environment files and tarballs. Keep all source, tests,
-   scripts, lockfile, licenses, examples, docs and `.github` workflow files.
-3. Check the exact candidate tree for credentials/private configuration and
-   confirm authorship and authorization for newly added code/data. Automated
-   pattern checks are useful but not a proof that arbitrary future code is safe.
-4. Initialize a fresh Git history only in the destination. Review files locally.
-   Remote creation, pushing and publishing require a separate explicit decision.
+CI runs for pushes and pull requests, using Node.js 22 and 24 on Ubuntu, Windows
+and macOS. It runs `npm ci --ignore-scripts`, `npm test`, `npm run build`, dependency
+source/license checks, schema and notice drift checks, `npm run check:release`
+and a package dry run. All Actions use pinned commit SHAs from GitHub's `actions`
+organization. Checkouts do not persist credentials.
 
-CI validates schema drift and tests Node 22/24 on three operating systems. npm
-packaging includes compiled runtime code, docs, examples and license notices.
-The Git repository additionally includes source and tests. `npm pack --dry-run`
-does not publish. No automated publishing workflow is provided.
+Release runs only for pushed `v*` tags. The tag must exactly equal `v` followed by
+`package.json.version`; both root versions in `package-lock.json` must match.
+After the same six CI combinations pass, a read-only job rebuilds, tests, checks
+licenses and the release boundary, then creates:
+
+- `chemdatadoctor-mcp-<version>.tgz`: an installation archive created by `npm pack`.
+- `SHA256SUMS`: the SHA-256 checksum of that archive.
+
+The package inventory is validated before upload. Only the final job has
+`contents: write`; it downloads those assets, checks their SHA-256 and uses the
+official GitHub CLI with `--verify-tag` to create the Release and upload assets.
+Tags containing a prerelease suffix create a prerelease. Existing Releases are
+not overwritten: a rerun fails at creation if a Release already exists. Review
+partial publication manually rather than deleting tags or replacing assets.
+
+No npm publication occurs. `npm pack` only creates a local archive. A future npm
+publishing workflow requires a separate decision and configuration.
+
+## First release: v0.1.0
+
+1. Have a maintainer enable Actions in the public repository. Ensure organization
+   policies allow the pinned official Actions, reusable workflows and a job-level
+   `contents: write` grant. No public repository secret or npm token is needed.
+2. In the source repository, commit and merge the reviewed export, allowlist and
+   sync workflow changes. For source synchronization only, update the existing
+   fine-grained sync token to permit Workflows read/write in addition to Contents
+   and Pull requests read/write on this public repository. Keep this token in the
+   existing private sync environment; never add it to public Release jobs.
+3. Run the existing source sync in `verify` mode, then `pull-request` mode. Review
+   the public PR, including both workflow files, and wait for all six CI checks.
+   Merge the PR into public `main` using the normal review process.
+4. After the owner approves the release, use a separate checkout of the **public**
+   repository. Confirm the remote before creating a tag:
+
+   ```sh
+   git clone https://github.com/chemaiatlas/chemdatadoctor-mcp.git
+   cd chemdatadoctor-mcp
+   git remote -v
+   git switch main
+   git pull --ff-only origin main
+   git status --short
+   node -p "require('./package.json').version"
+   git ls-remote --tags origin refs/tags/v0.1.0
+   ```
+
+   Require a clean tree, version `0.1.0`, successful CI for this commit, no existing
+   `v0.1.0` tag, and no existing `v0.1.0` Release in the GitHub Releases page.
+5. With that approval, create and push the tag from this public checkout:
+
+   ```sh
+   git tag -a v0.1.0 -m "ChemDataDoctor MCP v0.1.0"
+   git push origin refs/tags/v0.1.0
+   ```
+
+   The tag push authorizes the configured automatic Release. Do not tag or push
+   the parent source repository for this operation. If using a token to push,
+   use a maintainer credential that triggers workflows; pushes by a workflow's
+   default `GITHUB_TOKEN` do not trigger another push workflow.
+6. Watch Actions → Release. Require version, validation, package and publish jobs
+   to succeed. Confirm both assets on Releases → v0.1.0 and download them:
+
+   ```sh
+   shasum -a 256 -c SHA256SUMS
+   npm install --ignore-scripts ./chemdatadoctor-mcp-0.1.0.tgz
+   node node_modules/chemdatadoctor-mcp/dist/cli.js --data-root /absolute/path/to/data
+   ```
+
+   Use an existing dedicated data directory. The CLI waits for an MCP client on
+   stdin. The archive includes compiled code; installation fetches dependencies,
+   and runtime cleaning remains local and offline. Source archives generated by
+   GitHub are also available on the Release page.
+
+## Permissions to configure manually
+
+- Public repository: enable Actions and allow the pinned official Actions and
+  reusable workflow. Keep the default workflow token read-only; allow this
+  workflow's explicit publish-job `contents: write`. No PAT is used for Releases.
+- Source sync: existing private environment secret needs Workflows read/write
+  because it now updates exactly two workflow files. Restrict it to this public
+  repository, retain the existing review gate, and obtain organization approval
+  if required. No Actions, Secrets or Administration permission is needed.
+- Maintainer: needs permission to merge the sync PR and push a `v*` tag. Review
+  tag rulesets and release policies so they allow the intended maintainer and
+  `GITHUB_TOKEN` release creation. Do not grant the sync identity bypass rights.
+
+Official references: [GitHub token permissions](https://docs.github.com/en/actions/tutorials/authenticate-with-github_token)
+and [GitHub CLI release creation](https://cli.github.com/manual/gh_release_create).
