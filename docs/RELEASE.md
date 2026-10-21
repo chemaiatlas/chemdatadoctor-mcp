@@ -8,8 +8,10 @@ package metadata, public documentation, examples and third-party license texts.
 
 ## Validation and release behavior
 
-CI runs for pushes and pull requests, using Node.js 22 and 24 on Ubuntu, Windows
-and macOS. It runs `npm ci --ignore-scripts`, `npm test`, `npm run build`, dependency
+CI runs for pushes to `main`, pull requests, and reusable workflow calls from
+Release, using Node.js 22 and 24 on Ubuntu, Windows and macOS. Sync branch pushes
+do not run a separate CI matrix; their pull requests run the full checks.
+It runs `npm ci --ignore-scripts`, `npm test`, `npm run build`, dependency
 source/license checks, schema and notice drift checks, `npm run check:release`
 and a package dry run. All Actions use pinned commit SHAs from GitHub's `actions`
 organization. Checkouts do not persist credentials.
