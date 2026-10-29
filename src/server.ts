@@ -44,19 +44,30 @@ const descriptions = {
   quality_report: 'Read and inspect a dataset without writing files. Same path/row limits and zero-based mappings as clean_dataset. applyFixes previews safe fixes only. Default summary only.',
 };
 
-export function createServer(roots: LocalRoots) {
+// Remote datasets are inline only. No input path or artifact path is exposed.
+const remoteDatasetInput = datasetInput.innerType().omit({ path: true }).extend({
+  rows: datasetInput.innerType().shape.rows.unwrap(),
+}).strict();
+const remoteSchemas = {
+  ...toolSchemas,
+  clean_dataset: { input: remoteDatasetInput, output: envelope(z.object({ summary, rows: z.array(z.array(z.union([text, z.number(), z.boolean()]))), samples: z.array(sample) })) },
+  quality_report: { input: remoteDatasetInput, output: toolSchemas.quality_report.output },
+};
+
+export function createServer(roots: LocalRoots, options: { remote?: boolean } = {}) {
+  const schemas = options.remote ? remoteSchemas : toolSchemas;
   const server = new McpServer({ name: 'chemdatadoctor-mcp', version: '0.1.0' }, { maxToolInputElements: 100000 });
-  for (const toolName of Object.keys(toolSchemas) as (keyof typeof toolSchemas)[]) {
-    const schema = toolSchemas[toolName];
+  for (const toolName of Object.keys(schemas) as (keyof typeof toolSchemas)[]) {
+    const schema = schemas[toolName];
     server.registerTool(toolName, {
-      description: descriptions[toolName], inputSchema: schema.input, outputSchema: schema.output,
-      annotations: { readOnlyHint: toolName !== 'clean_dataset', destructiveHint: false, idempotentHint: toolName !== 'clean_dataset', openWorldHint: false },
+      description: options.remote && ['clean_dataset', 'quality_report'].includes(toolName) ? 'Inspect inline rows with explicit zero-based column mappings. No server file access or persistence. clean_dataset returns cleaned rows; quality_report returns summary only.' : descriptions[toolName], inputSchema: schema.input, outputSchema: schema.output,
+      annotations: { readOnlyHint: options.remote || toolName !== 'clean_dataset', destructiveHint: false, idempotentHint: options.remote || toolName !== 'clean_dataset', openWorldHint: false },
     }, async (raw: unknown) => {
       let output: Record<string, unknown>;
       try {
         // Parse again to retain refinements/defaults consistently across SDK releases.
         const args = schema.input.parse(raw);
-        if (Buffer.byteLength(JSON.stringify(args)) > 1024 * 1024) throw new ToolError('LIMIT', 'Inline tool arguments exceed 1 MiB; use a local file.');
+        if (Buffer.byteLength(JSON.stringify(args)) > 1024 * 1024) throw new ToolError('LIMIT', options.remote ? 'Inline tool arguments exceed 1 MiB.' : 'Inline tool arguments exceed 1 MiB; use a local file.');
         let data: unknown;
         switch (toolName) {
           case 'validate_cas': { const a = toolSchemas.validate_cas.input.parse(args); data = { results: a.values.map(v => checkCas(v, a.applyFixes)) }; break; }
@@ -64,11 +75,11 @@ export function createServer(roots: LocalRoots) {
           case 'validate_formulas': { const a = toolSchemas.validate_formulas.input.parse(args); data = { results: a.values.map(checkFormula) }; break; }
           case 'detect_duplicates': { const a = toolSchemas.detect_duplicates.input.parse(args); data = duplicates(a.values); break; }
           default: {
-            const a = datasetInput.parse(args);
+            const a = options.remote ? remoteDatasetInput.parse(args) : datasetInput.parse(args);
             const sheet = await readDataset(a, roots);
             const inspected = inspectDataset(sheet, a);
             const samples = inspected.records.slice(0, a.sampleLimit).map(r => ({ sourceRow: r.sourceRow, casStatus: r.cas.status, issueCodes: r.findings.map(f => f.code), duplicateOf: r.duplicateOf }));
-            data = { summary: inspected.summary, samples, ...(toolName === 'clean_dataset' ? { artifacts: await writeArtifacts(sheet, inspected, a, roots) } : {}) };
+            data = { summary: inspected.summary, samples, ...(toolName === 'clean_dataset' ? options.remote ? { rows: [...(a.header ? [sheet.rows[0]] : []), ...inspected.records.map(r => r.cleaned)] } : { artifacts: await writeArtifacts(sheet, inspected, a, roots) } : {}) };
           }
         }
         output = { ok: true, data };
